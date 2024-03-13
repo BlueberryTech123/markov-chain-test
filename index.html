@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo</title>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script>
+        let board = [["N", "N", "N"],
+                     ["N", "N", "N"],
+                     ["N", "N", "N"]];
+        let moves = []
+        function refresh() {
+            let game = document.querySelector("#game");
+            game.innerHTML = ""
+            for (let i = 0; i < 3; i++) {
+                for (let j = 0; j < 3; j++) {
+                    let cur = board[i][j];
+                    let attr = "";
+
+                    if (cur == "N") {
+                        cur = "-";
+                    }
+                    else {
+                        attr = "disabled";
+                    }
+
+                    game.innerHTML += `<button class="game-btn" onclick="move(${j}, ${i});" ${attr}>${cur}</button>`;
+                }
+                game.innerHTML += "<br>";
+            }
+            game.innerHTML += "<h2>--</h2>";
+        }
+        function update(x, y, player) {
+            board[y][x] = player;
+            moves.push([x, y]);
+            refresh();
+        }
+        function checkRows() {
+            for (let i = 0; i < 3; i++) {
+                const initial_row = board[i][0];
+                const initial_col = board[0][i];
+                let row = initial_row != "N";
+                let col = initial_col != "N";
+
+                for (let j = 1; j < 3; j++) {
+                    if (!row && !col) break;
+                    const cur_row = board[i][j];
+                    const cur_col = board[j][i];
+
+                    if (row && initial_row != cur_row) {
+                        row = false;
+                    }
+                    else if (row && initial_row == cur_row && j == 2) return initial_row
+
+                    if (col && initial_col != cur_col) {
+                        col = false;
+                    }
+                    else if (col && initial_col == cur_col && j == 2) return initial_col
+                }
+            }
+            const diag1 = board[0][0] + board[1][1] + board[2][2];
+            const diag2 = board[2][0] + board[1][1] + board[0][2];
+            if (diag1 == "XXX" || diag1 == "OOO" || diag2 == "XXX" || diag2 == "OOO") {
+                return board[1][1];
+            }
+            return "N";
+        }
+        function sendWin() {
+            $.post(`/win/${btoa(JSON.stringify(moves))}`);
+        }
+        function stopGame() {
+            let game = document.querySelector("#game");
+            game.style.filter = "brightness(80%) grayscale(0.7)";
+            game.style.pointerEvents = "none";
+        }
+        function move(x, y) {
+            update(x, y, "X");
+            
+            // Check for rows
+            if (checkRows() != "N") {
+                document.getElementById("game").innerHTML += "<h2>Game over! Human wins!</h2>";
+                sendWin();
+                stopGame();
+                return;
+            }
+
+            document.getElementById("game").innerHTML += "<h2>Waiting for computer response...</h2>";
+            flattened_board = "";
+            for (let i = 0; i < 3; i++) {
+                for (let j = 0; j < 3; j++) {
+                    flattened_board += board[i][j];
+                }
+            }
+            $.post(`/move/${flattened_board}/${x}/${y}`, (data) => {
+                if (data == "fuck") {
+                    refresh();
+                    document.getElementById("game").innerHTML += "<h2>Game over!</h2>";
+                    stopGame();
+                    return;
+                }
+                update(data[0], data[1], "O"); // move opponent
+                if (checkRows() != "N") {
+                    document.getElementById("game").innerHTML += "<h2>Game over! Computer wins!</h2>";
+                    sendWin();
+                    stopGame();
+                }
+            });
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Courier New', Courier, monospace;
+        }
+        .game-btn {
+            background: transparent;
+            border: solid 2px lightblue;
+            color: lightblue;
+
+            font-family: inherit;
+            width: 50px;
+            height: 50px;
+            line-height: 25px;
+            text-align: center;
+            font-size: 20px;
+            margin: 10px;
+
+            cursor: pointer;
+            transition: 180ms;
+        }
+        .game-btn:hover {
+            transform: scale(110%);
+            background: #333;
+            color: white;
+            border-color: white;
+            outline: 1px solid #333;
+        }
+        .game-btn:disabled {
+            border: solid 2px red;
+            color: red;
+        }
+    </style>
+</head>
+<body onload="refresh()" onerror="alert(event)">
+    <center>
+        <h1>Trainable Tic-Tac-Toe</h1>
+        <p>The computer will get smarter (or dumber) as you play...</p>
+        <hr style="width: 50%;">
+        <div id="game"></div>
+        <hr style="width: 50%;">
+        <a href="/">[- RESET -]</a>
+    </center>
+</body>
+</html>
